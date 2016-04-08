@@ -2,8 +2,74 @@
 
 login_success=0
 ack_success=0
-conffile=~/.cyberoam_$1.conf
+option=0
+optcount=0
 user=$1
+
+function print_usage {
+	echo "Usage: cyberoam-client [-d|-s] username"
+	echo "-d : delete configuration file (if found) for username"
+	echo "-s : save configuration file (override if already exists) for username"
+	echo "If no option is specified, if config file for username exists it is then used otherwise no config file is used or created."
+	echo "Press ctrl-c or send SIGINT to process to logout."
+}
+
+#parsing options
+[[ $1 == "--help" ]] && print_usage && exit 0
+while getopts ":d::s:" opt; do
+	optcount= $[ $optcount + 1 ]
+	[[ $optcount > 1 ]] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
+	case $opt in
+		d)
+			user=$OPTARG
+			option=1
+		;;
+		s)
+			user=$OPTARG
+			option=2
+		;;
+		\?)
+			echo "Invalid option: -$OPTARG" >&2 && print_usage >&2
+			exit -2
+		;;
+		:)
+			echo "Option -$OPTARG requires an argument." >&2 && print_usage >&2
+			exit -2
+	esac
+done
+[ $# -gt 3 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
+
+conffile=~/.cyberoam_$user.conf
+# processing option -d
+if [ $option == 1 ]; then
+	if [ -e $conffile ]; then
+		rm $conffile && echo "Configuration file deleted succesfully"
+	else
+		echo "Specified Configuration file not found."
+	fi
+	exit 0
+fi
+
+function gather_details {
+	echo -n "Cyberoam server ip address: "
+	read url
+	echo -n "Password for $user: "
+	read -s password
+	echo ""
+}
+
+# processing option -s and the lack of any option
+if [ $option -eq 2 ]; then
+	[ -e $conffile ] && echo "">$conffile
+	gather_details
+	echo "url='$url'">>$conffile
+	echo "password=$password">>$conffile
+elif [ -e $conffile ]; then
+	. conffile
+else
+	gather_details
+fi
+
 function login {
 	echo "Attempting login"
 	response=`curl -s -k -d mode=191 -d username=$user -d password=$password https://$url:8090/login.xml`
@@ -37,27 +103,12 @@ function logoutt {
 	else
 		echo "Logout failed"
 	fi
-	kill -INT $$
+	trap - SIGINT
+	exit 0
 }
-if [ ! -e $conffile ]
-	then
-	if [ $# -ne 1 ]
-		then
-		echo "Error: Illegal number of parameters."
-		echo "Usage: cyberoam-client <username>"
-		echo "Press ctrl-c or send SIGINT to process to logout."
-		exit 0
-	fi
-	echo -n "Cyberoam server ip address: "
-	read url
-	echo "url='$url'">>$conffile
-	echo -n "Password for $1: "
-	read -s password
-	echo "password=$password">>$conffile
-else . $conffile
-fi
 
-# attempt=0 means it will now attempt to login, 1 means ack
+
+# attempt=0 means it will attempt to login, 1 means ack
 attempt=0
 while [ 1 ]
 do
@@ -67,10 +118,7 @@ do
 		;;
 		1)	sleep 180
 			ack
-			if [[ $ack_success == 0 ]]; then
-				echo "Acknowledgement failed"
-				attempt=0
-			fi
+			[[ $ack_success == 0 ]] && echo "Acknowledgement failed" && attempt=0
 		;;
 	esac
 done
