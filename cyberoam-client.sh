@@ -2,7 +2,6 @@
 
 login_success=0
 ack_success=0
-logout_success=0
 conffile=~/.cyberoam_$1.conf
 user=$1
 function login {
@@ -31,13 +30,12 @@ function logoutt {
 	echo "Attempting logout"
 	response=`curl -s -k -d mode=193 -d username=$user https://$url:8090/logout.xml`
 	if [[ $response =~ "You have successfully logged off" ]]; then
-		echo "Logged out successfully"; logout_success=1
+		echo "Logged out successfully"
+		exit 0
 	else
 		echo "Logout failed"
-		logout_success=0
 	fi
 }
-
 if [ ! -e $conffile ]
 	then
 	if [ $# -ne 1 ]
@@ -53,7 +51,7 @@ if [ ! -e $conffile ]
 else . $conffile
 fi
 
-# attempt=0 means it will now attempt to login, 1 means ack, 3 means exit
+# attempt=0 means it will now attempt to login, 1 means ack
 attempt=0
 while [ 1 ]
 do
@@ -67,8 +65,6 @@ do
 				echo "Acknowledgement failed"
 				attempt=0
 			fi
-		;;
-		3)	exit 0
 		;;
 	esac
 done
