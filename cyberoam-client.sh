@@ -31,10 +31,10 @@ function logoutt {
 	response=`curl -s -k -d mode=193 -d username=$user https://$url:8090/logout.xml`
 	if [[ $response =~ "You have successfully logged off" ]]; then
 		echo "Logged out successfully"
-		exit 0
 	else
 		echo "Logout failed"
 	fi
+	exit 0
 }
 if [ ! -e $conffile ]
 	then
