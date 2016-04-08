@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 login_success=0
 ack_success=0
@@ -7,9 +7,12 @@ user=$1
 function login {
 	echo "Attempting login"
 	response=`curl -s -k -d mode=191 -d username=$user -d password=$password https://$url:8090/login.xml`
-	if [[ $response =~ "You have successfully logged in" ]]; then
+	if [[ $response =~ "successfully logged in" ]]; then
 		echo "Logged in successfully"
 		login_success=1
+	elif [[ $response =~ "Maximum Login Limit" ]]; then
+		>&2 echo "Maximum Login Limit Reached"
+		exit -1
 	else
 		echo "Login failed"
 		login_success=0
@@ -34,12 +37,15 @@ function logoutt {
 	else
 		echo "Logout failed"
 	fi
-	exit 0
+	kill -INT $$
 }
 if [ ! -e $conffile ]
 	then
 	if [ $# -ne 1 ]
-		then echo "Error: Illegal number of parameters.\n Usage: cyberoam_client <username>"
+		then
+		echo "Error: Illegal number of parameters."
+		echo "Usage: cyberoam-client <username>"
+		echo "Press ctrl-c or send SIGINT to process to logout."
 		exit 0
 	fi
 	echo -n "Cyberoam server ip address: "
@@ -59,9 +65,9 @@ do
 		0)	login
 			[[ $login_success == 1 ]] && attempt=1 && trap logoutt SIGINT
 		;;
-		1)	ack
-			if [[ $ack_success == 1 ]]; then sleep 180;
-			else
+		1)	sleep 180
+			ack
+			if [[ $ack_success == 0 ]]; then
 				echo "Acknowledgement failed"
 				attempt=0
 			fi
