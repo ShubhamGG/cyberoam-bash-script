@@ -13,8 +13,8 @@ function _cyberoam_client()
 			shopt -s nullglob
 			for i in ~/.cyberoam_*.conf
 			do
-				local a=${a#*_}
-				list1="$list1 ${i%.*}"
+				local a=${i#*_}
+				list1="$list1 ${a%.*}"
 			done
 		fi
 

@@ -17,7 +17,7 @@ function print_usage {
 #parsing options
 [[ $1 == "--help" ]] && print_usage && exit 0
 while getopts ":d::s:" opt; do
-	optcount= $[ $optcount + 1 ]
+	optcount=$[ $optcount + 1 ]
 	[[ $optcount > 1 ]] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
 	case $opt in
 		d)
@@ -65,7 +65,7 @@ if [ $option -eq 2 ]; then
 	echo "url='$url'">>$conffile
 	echo "password=$password">>$conffile
 elif [ -e $conffile ]; then
-	. conffile
+	. $conffile
 else
 	gather_details
 fi
@@ -108,7 +108,7 @@ function logoutt {
 }
 
 
-# attempt=0 means it will attempt to login, 1 means ack
+# attempt=0 means it will now attempt to login, 1 means ack
 attempt=0
 while [ 1 ]
 do
@@ -118,7 +118,10 @@ do
 		;;
 		1)	sleep 180
 			ack
-			[[ $ack_success == 0 ]] && echo "Acknowledgement failed" && attempt=0
+			if [[ $ack_success == 0 ]]; then
+				echo "Acknowledgement failed"
+				attempt=0
+			fi
 		;;
 	esac
 done
