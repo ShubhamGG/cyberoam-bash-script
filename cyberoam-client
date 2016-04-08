@@ -17,7 +17,7 @@ function print_usage {
 #parsing options
 [[ $1 == "--help" ]] && print_usage && exit 0
 while getopts ":d::s:" opt; do
-	optcount= $[ $optcount + 1 ]
+	optcount=$[ $optcount + 1 ]
 	[[ $optcount > 1 ]] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
 	case $opt in
 		d)
