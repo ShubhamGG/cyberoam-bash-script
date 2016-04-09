@@ -1,25 +1,26 @@
-#!/bin/bash -e
+#!/bin/bash
 
 login_success=0
 ack_success=0
 option=0
 optcount=0
-user=$1
 quiet=0
+verbose=0
 name=$0
 name=${name##*/}
 function print_usage {
-	echo "Usage: $name { [-q] [-d|-s] username | -l } "
-	echo "-d : delete configuration file (if found) for username"
-	echo "-s : save configuration file (override if already exists) for username"
-	echo "-q : Be quiet i.e. don't send notifications of events"
+	echo "Usage: $name [-v] { [-q] [-d|-s] <username> | -l } "
+	echo "-d : delete configuration file (if found) for username."
+	echo "-s : save configuration file (override if already exists) for username."
+	echo "-q : Be quiet i.e. don't send notifications of events."
 	echo "-l : logout. Other way to logout is to send ctrl-c i.e. SIGINT to the running process of $name."
+	echo "-v : give verbose output."
 	echo "If -s is not specified, then if config file for username exists it is used otherwise the login info is not stored."
 }
 
 #parsing options
 [[ $1 == "--help" ]] && print_usage && exit 0
-while getopts ":d::s::ql" opt; do
+while getopts ":d::s::qlv" opt; do
 	case $opt in
 		d)
 			optcount=$[ $optcount + 1 ]
@@ -36,6 +37,9 @@ while getopts ":d::s::ql" opt; do
 		q)
 			quiet=1
 		;;
+		v)
+			verbose=1
+		;;
 		l)
 			[ $quiet -eq 1 ] || [ $optcount -gt 0 ] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
 			option=3
@@ -49,27 +53,40 @@ while getopts ":d::s::ql" opt; do
 			exit -2
 	esac
 done
-[ $quiet -eq 1 ] && [ $# -gt 4 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
-[ $option -eq 3 ] && [ $# -gt 2 ] &&  echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
+optcount=0
+[ $verbose -eq 1 ] && optcount=$[ $optcount + 1 ]
+[ $option -eq 3 ] && [ $[ $# - $optcount ] -gt 2 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
+[ $quiet -eq 1 ] && optcount=$[ $optcount + 1 ]
+[ $[ $# - $optcount ] -gt 3 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
 
 # Checking if another process is running
-other=`ps -e | grep $name`
-[ -n "$other" ] && other=$other[0]
+other=`ps -lC $name | grep -v PID | grep -v $$`
+[ -n "$other" ] && other=`echo $other | awk '{print $4}'`
 if [ $option -eq 3 ]; then # Logging out by sending SIGINT to other process
 	if [ -z "$other" ]; then
 		echo "No running process of $name found."
 	else
 		kill -INT $other
+		pkill -P $other sleep
+		[ $verbose -eq 1 ] && echo "`date +%H:%M:%S` : kill command sent."
 	fi
-else #preventing duplicate processes from running
+	exit 0
+elif [ -n "$other" ]; then #preventing duplicate processes from running
 	echo "$name already running with pid $other."
+	exit 0
+fi
+
+if [ $option -eq 0 ]; then
+	[ $optcount -eq 0 ] && user=$1
+	[ $optcount -eq 1 ] && user=$2
+	[ $optcount -eq 2 ] && user=$3
 fi
 
 conffile=~/.cyberoam_$user.conf
 # processing option -d i.e. deleting conffile
 if [ $option == 1 ]; then
 	if [ -e $conffile ]; then
-		rm $conffile && echo "Configuration file deleted succesfully"
+		rm $conffile && [ $verbose -eq 1 ] && echo "Configuration file deleted succesfully"
 	else
 		echo "Specified Configuration file not found."
 	fi
@@ -96,25 +113,30 @@ else
 	gather_details
 fi
 
+if [ $verbose -eq 0 ]; then
+	echo $$
+	exec &>/dev/null
+fi
+
 function login {
-	echo "Attempting login"
+	echo "`date +%H:%M:%S` : Attempting login"
 	response=`curl -s -k -d mode=191 -d username=$user -d password=$password https://$url:8090/login.xml`
 	if [[ $response =~ "successfully logged in" ]]; then
-		echo "Logged in successfully"
+		echo "`date +%H:%M:%S` : Logged in successfully"
 		[ $quiet -eq 0 ] && notify-send "Logged in successfully" "user: $user"
 		login_success=1
 	elif [[ $response =~ "Maximum Login Limit" ]]; then
-		>&2 echo "Maximum Login Limit Reached"
+		>&2 echo "`date +%H:%M:%S` : Maximum Login Limit Reached"
 		[ $quiet -eq 0 ] && notify-send "Maximum Login Limit Reached" "user: $user"
 		exit -1
 	else
-		echo "Login failed"
+		echo "`date +%H:%M:%S` : Login failed"
 		login_success=0
 	fi
 }
 
 function ack {
-	echo "Sending keep-alive request `date +%H:%M:%S`"
+	echo "`date +%H:%M:%S` : Sending keep-alive request"
 	response=`curl -s -k -G -d mode=192 -d username=$user https://$url:8090/live`
 	if [[ $response =~ "<ack><![CDATA[ack]]></ack>" ]]; then
 		ack_success=1
@@ -124,13 +146,13 @@ function ack {
 }
 
 function logoutt {
-	echo "Attempting logout"
+	echo "`date +%H:%M:%S` : Attempting logout"
 	response=`curl -s -k -d mode=193 -d username=$user https://$url:8090/logout.xml`
 	if [[ $response =~ "You have successfully logged off" ]]; then
-		echo "Logged out successfully"
+		echo "`date +%H:%M:%S` : Logged out successfully"
 		[ $quiet -eq 0 ] && notify-send "Logged out successfully" "user: $user"
 	else
-		echo "Logout failed"
+		echo "`date +%H:%M:%S` : Logout failed"
 		[ $quiet -eq 0 ] && notify-send "Logout Failed" "user: $user"
 	fi
 	trap - SIGINT
