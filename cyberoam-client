@@ -19,29 +19,24 @@ function print_usage {
 }
 
 #parsing options
-[[ $1 == "--help" ]] && print_usage && exit 0
+[ $# -eq 0 ] || [[ $1 == "--help" ]] && print_usage && exit 0
 while getopts ":d::s::qlv" opt; do
 	case $opt in
-		d)
-			optcount=$[ $optcount + 1 ]
+		d)	optcount=$[ $optcount + 1 ]
 			[[ $optcount > 1 ]] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
 			user=$OPTARG
 			option=1
 		;;
-		s)	
-			optcount=$[ $optcount + 1 ]
+		s)	optcount=$[ $optcount + 1 ]
 			[[ $optcount > 1 ]] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
 			user=$OPTARG
 			option=2
 		;;
-		q)
-			quiet=1
+		q)	quiet=1
 		;;
-		v)
-			verbose=1
+		v)	verbose=1
 		;;
-		l)
-			[ $quiet -eq 1 ] || [ $optcount -gt 0 ] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
+		l)	[ $quiet -eq 1 ] || [ $optcount -gt 0 ] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
 			option=3
 		;;
 		\?)
@@ -55,9 +50,9 @@ while getopts ":d::s::qlv" opt; do
 done
 optcount=0
 [ $verbose -eq 1 ] && optcount=$[ $optcount + 1 ]
-[ $option -eq 3 ] && [ $[ $# - $optcount ] -gt 2 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
+[ $option -eq 3 ] && [ $[ $# - $optcount ] -gt 1 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
 [ $quiet -eq 1 ] && optcount=$[ $optcount + 1 ]
-[ $[ $# - $optcount ] -gt 3 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
+[ $[ $# - $optcount ] -gt 2 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
 
 # Checking if another process is running
 other=`ps -lC $name | grep -v PID | grep -v $$`
@@ -113,8 +108,8 @@ else
 	gather_details
 fi
 
+# Implement verbose cutoff
 if [ $verbose -eq 0 ]; then
-	echo $$
 	exec &>/dev/null
 fi
 
