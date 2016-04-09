@@ -5,28 +5,40 @@ ack_success=0
 option=0
 optcount=0
 user=$1
-
+quiet=0
+name=$0
+name=${name##*/}
 function print_usage {
-	echo "Usage: cyberoam-client [-d|-s] username"
+	echo "Usage: $name { [-q] [-d|-s] username | -l } "
 	echo "-d : delete configuration file (if found) for username"
 	echo "-s : save configuration file (override if already exists) for username"
-	echo "If no option is specified, if config file for username exists it is then used otherwise no config file is used or created."
-	echo "Press ctrl-c or send SIGINT to process to logout."
+	echo "-q : Be quiet i.e. don't send notifications of events"
+	echo "-l : logout. Other way to logout is to send ctrl-c i.e. SIGINT to the running process of $name."
+	echo "If -s is not specified, then if config file for username exists it is used otherwise the login info is not stored."
 }
 
 #parsing options
 [[ $1 == "--help" ]] && print_usage && exit 0
-while getopts ":d::s:" opt; do
-	optcount=$[ $optcount + 1 ]
-	[[ $optcount > 1 ]] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
+while getopts ":d::s::ql" opt; do
 	case $opt in
 		d)
+			optcount=$[ $optcount + 1 ]
+			[[ $optcount > 1 ]] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
 			user=$OPTARG
 			option=1
 		;;
-		s)
+		s)	
+			optcount=$[ $optcount + 1 ]
+			[[ $optcount > 1 ]] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
 			user=$OPTARG
 			option=2
+		;;
+		q)
+			quiet=1
+		;;
+		l)
+			[ $quiet -eq 1 ] || [ $optcount -gt 0 ] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
+			option=3
 		;;
 		\?)
 			echo "Invalid option: -$OPTARG" >&2 && print_usage >&2
@@ -37,10 +49,24 @@ while getopts ":d::s:" opt; do
 			exit -2
 	esac
 done
-[ $# -gt 3 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
+[ $quiet -eq 1 ] && [ $# -gt 4 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
+[ $option -eq 3 ] && [ $# -gt 2 ] &&  echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
+
+# Checking if another process is running
+other=`ps -e | grep $name`
+[ -n "$other" ] && other=$other[0]
+if [ $option -eq 3 ]; then # Logging out by sending SIGINT to other process
+	if [ -z "$other" ]; then
+		echo "No running process of $name found."
+	else
+		kill -INT $other
+	fi
+else #preventing duplicate processes from running
+	echo "$name already running with pid $other."
+fi
 
 conffile=~/.cyberoam_$user.conf
-# processing option -d
+# processing option -d i.e. deleting conffile
 if [ $option == 1 ]; then
 	if [ -e $conffile ]; then
 		rm $conffile && echo "Configuration file deleted succesfully"
@@ -58,7 +84,7 @@ function gather_details {
 	echo ""
 }
 
-# processing option -s and the lack of any option
+# processing option -s and the case with neither -s nor -d
 if [ $option -eq 2 ]; then
 	[ -e $conffile ] && echo "">$conffile
 	gather_details
@@ -75,9 +101,11 @@ function login {
 	response=`curl -s -k -d mode=191 -d username=$user -d password=$password https://$url:8090/login.xml`
 	if [[ $response =~ "successfully logged in" ]]; then
 		echo "Logged in successfully"
+		[ $quiet -eq 0 ] && notify-send "Logged in successfully" "user: $user"
 		login_success=1
 	elif [[ $response =~ "Maximum Login Limit" ]]; then
 		>&2 echo "Maximum Login Limit Reached"
+		[ $quiet -eq 0 ] && notify-send "Maximum Login Limit Reached" "user: $user"
 		exit -1
 	else
 		echo "Login failed"
@@ -100,8 +128,10 @@ function logoutt {
 	response=`curl -s -k -d mode=193 -d username=$user https://$url:8090/logout.xml`
 	if [[ $response =~ "You have successfully logged off" ]]; then
 		echo "Logged out successfully"
+		[ $quiet -eq 0 ] && notify-send "Logged out successfully" "user: $user"
 	else
 		echo "Logout failed"
+		[ $quiet -eq 0 ] && notify-send "Logout Failed" "user: $user"
 	fi
 	trap - SIGINT
 	exit 0

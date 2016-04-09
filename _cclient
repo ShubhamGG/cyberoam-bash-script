@@ -3,24 +3,15 @@ function _cyberoam_client()
 	local word=${COMP_WORDS[COMP_CWORD]}
 	local prev=${COMP_WORDS[COMP_CWORD-1]}
 	
-	if [ $COMP_CWORD -lt 3 ]; then
-		
-		if [ $COMP_CWORD -eq 2 ] && [[ $prev != "-"* ]]; then
-			local list1=""
-		else
-			local list1=""
-			[ $COMP_CWORD -eq 1 ] && list1="-s -d --help"
-			shopt -s nullglob
-			for i in ~/.cyberoam_*.conf
-			do
-				local a=${i#*_}
-				list1="$list1 ${a%.*}"
-			done
-		fi
-
-	else local list1=""
+	list1=""
+	if [ ! $prev == "-l" ] && [ ! $prev == "--help" ] && [ $COMP_CWORD == 1 ] || [[ $prev =~ "-" ]] ; then 
+		shopt -s nullglob
+		for i in ~/.cyberoam_*.conf
+		do
+			local a=${i#*_}
+			list1="$list1 ${a%.*}"
+		done
 	fi
-
 	COMPREPLY=($(compgen -W "${list1}" -- ${word}))
 	return 0
 }
