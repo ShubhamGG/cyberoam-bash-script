@@ -1,6 +1,8 @@
 #!/bin/bash
 
 login_success=0
+LOGIN_COUNT_MAX=5
+login_count=$LOGIN_COUNT_MAX
 ack_success=0
 option=0
 optcount=0
@@ -77,8 +79,8 @@ if [ $option -eq 0 ]; then
 	[ $optcount -eq 2 ] && user=$3
 fi
 
-conffile=~/.cyberoam_$user.conf
 # processing option -d i.e. deleting conffile
+conffile=~/.cyberoam_$user.conf
 if [ $option == 1 ]; then
 	if [ -e $conffile ]; then
 		rm $conffile && [ $verbose -eq 1 ] && echo "Configuration file deleted succesfully"
@@ -108,41 +110,54 @@ else
 	gather_details
 fi
 
-# Implement verbose cutoff
+# Implement non-verbose cutoff from terminal i.e. takes itself to background
 if [ $verbose -eq 0 ]; then
-	exec &>/dev/null
+	comman="$name -v"
+	[ $quiet -eq 1 ] && comman="$comman -q"
+	[ ! -p ~/.cyberoam ] && mkfifo ~/.cyberoam
+	inp=""
+	( setsid $comman $user > ~/abc < ~/.cyberoam )&
+	if [ ! -e conffile ]; then
+		echo $url > ~/.cyberoam
+		echo $password > ~/.cyberoam
+	fi
+	exit 0
 fi
 
 function login {
+	login_success=0
+	trap - SIGINT
 	echo "`date +%H:%M:%S` : Attempting login"
-	response=`curl -s -k -d mode=191 -d username=$user -d password=$password https://$url:8090/login.xml`
+	local response=`curl -s -k -d mode=191 -d username=$user -d password=$password https://$url:8090/login.xml`
 	if [[ $response =~ "successfully logged in" ]]; then
 		echo "`date +%H:%M:%S` : Logged in successfully"
 		[ $quiet -eq 0 ] && notify-send "Logged in successfully" "user: $user"
 		login_success=1
+		login_count=$LOGIN_COUNT_MAX
 	elif [[ $response =~ "Maximum Login Limit" ]]; then
 		>&2 echo "`date +%H:%M:%S` : Maximum Login Limit Reached"
 		[ $quiet -eq 0 ] && notify-send "Maximum Login Limit Reached" "user: $user"
 		exit -1
 	else
 		echo "`date +%H:%M:%S` : Login failed"
-		login_success=0
+		login_count=$[ $login_count - 1 ]
+		if [ $login_count -eq 0 ]; then
+			[ $quiet -eq 0 ] && notify-send "Login Failed" "user: $user"
+			exit 0
+		fi
 	fi
 }
 
 function ack {
+	ack_success=0
 	echo "`date +%H:%M:%S` : Sending keep-alive request"
-	response=`curl -s -k -G -d mode=192 -d username=$user https://$url:8090/live`
-	if [[ $response =~ "<ack><![CDATA[ack]]></ack>" ]]; then
-		ack_success=1
-	else
-		ack_success=0
-	fi
+	local response=`curl -s -k -G -d mode=192 -d username=$user https://$url:8090/live`
+	[[ $response =~ "<ack><![CDATA[ack]]></ack>" ]] && ack_success=1
 }
 
 function logoutt {
 	echo "`date +%H:%M:%S` : Attempting logout"
-	response=`curl -s -k -d mode=193 -d username=$user https://$url:8090/logout.xml`
+	local response=`curl -s -k -d mode=193 -d username=$user https://$url:8090/logout.xml`
 	if [[ $response =~ "You have successfully logged off" ]]; then
 		echo "`date +%H:%M:%S` : Logged out successfully"
 		[ $quiet -eq 0 ] && notify-send "Logged out successfully" "user: $user"
@@ -151,9 +166,9 @@ function logoutt {
 		[ $quiet -eq 0 ] && notify-send "Logout Failed" "user: $user"
 	fi
 	trap - SIGINT
+	kill -INT $$
 	exit 0
 }
-
 
 # attempt=0 means it will now attempt to login, 1 means ack
 attempt=0
@@ -165,10 +180,7 @@ do
 		;;
 		1)	sleep 180
 			ack
-			if [[ $ack_success == 0 ]]; then
-				echo "Acknowledgement failed"
-				attempt=0
-			fi
+			[[ $ack_success == 0 ]] && echo "Acknowledgement failed" && attempt=0
 		;;
 	esac
 done
