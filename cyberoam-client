@@ -17,7 +17,7 @@ function print_usage {
 	echo "-q : Be quiet i.e. don't send notifications of events."
 	echo "-l : logout. Other way to logout is to send ctrl-c i.e. SIGINT to the running process of $name."
 	echo "-v : give verbose output."
-	echo "If -s is not specified, then if config file for username exists it is used otherwise the login info is not stored."
+	echo "If -s is not specified, then saved config file for username is used (no input asked). If the config file doesn't exist, the login info needs to be inputted and is not stored."
 }
 
 #parsing options
@@ -115,8 +115,7 @@ if [ $verbose -eq 0 ]; then
 	comman="$name -v"
 	[ $quiet -eq 1 ] && comman="$comman -q"
 	[ ! -p ~/.cyberoam ] && mkfifo ~/.cyberoam
-	inp=""
-	( setsid $comman $user > ~/abc < ~/.cyberoam )&
+	( setsid $comman $user > ~/dev/null < ~/.cyberoam )&
 	if [ ! -e conffile ]; then
 		echo $url > ~/.cyberoam
 		echo $password > ~/.cyberoam
