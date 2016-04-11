@@ -1,7 +1,9 @@
 #!/bin/bash
 
-login_success=0
+ACK_TOLERATE_MAX=2
+ACK_TOLERATE_SLEEP=10
 LOGIN_COUNT_MAX=5
+login_success=0
 login_count=$LOGIN_COUNT_MAX
 ack_success=0
 option=0
@@ -56,23 +58,7 @@ optcount=0
 [ $quiet -eq 1 ] && optcount=$[ $optcount + 1 ]
 [ $[ $# - $optcount ] -gt 2 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
 
-# Checking if another process is running
-other=`ps -lC $name | grep -v PID | grep -v $$`
-[ -n "$other" ] && other=`echo $other | awk '{print $4}'`
-if [ $option -eq 3 ]; then # Logging out by sending SIGINT to other process
-	if [ -z "$other" ]; then
-		echo "No running process of $name found."
-	else
-		kill -INT $other
-		pkill -P $other sleep
-		[ $verbose -eq 1 ] && echo "`date +%H:%M:%S` : kill command sent."
-	fi
-	exit 0
-elif [ -n "$other" ]; then #preventing duplicate processes from running
-	echo "$name already running with pid $other."
-	exit 0
-fi
-
+# Setting user variable
 if [ $option -eq 0 ]; then
 	[ $optcount -eq 0 ] && user=$1
 	[ $optcount -eq 1 ] && user=$2
@@ -87,6 +73,23 @@ if [ $option == 1 ]; then
 	else
 		echo "Specified Configuration file not found."
 	fi
+	exit 0
+fi
+
+# Checking if another process is running
+other=`ps -lC $name | grep -v PID | grep -v $$`
+[ -n "$other" ] && other=`echo $other | awk '{print $4}'`
+if [ $option -eq 3 ]; then # Logging out by sending SIGINT to other process
+	if [ -z "$other" ]; then
+		echo "No running process of $name found."
+	else
+		kill -INT $other
+		pkill -P $other sleep
+		[ $verbose -eq 1 ] && echo "`date +%H:%M:%S` : kill command sent."
+	fi
+	exit 0
+elif [ -n "$other" ]; then #preventing duplicate processes from running
+	echo "$name already running with pid $other."
 	exit 0
 fi
 
@@ -116,10 +119,7 @@ if [ $verbose -eq 0 ]; then
 	[ $quiet -eq 1 ] && comman="$comman -q"
 	[ ! -p ~/.cyberoam ] && mkfifo ~/.cyberoam
 	( setsid $comman $user > ~/dev/null < ~/.cyberoam )&
-	if [ ! -e conffile ]; then
-		echo $url > ~/.cyberoam
-		echo $password > ~/.cyberoam
-	fi
+	[ ! -e conffile ] && echo $url > ~/.cyberoam && echo $password > ~/.cyberoam
 	exit 0
 fi
 
@@ -179,7 +179,19 @@ do
 		;;
 		1)	sleep 180
 			ack
-			[[ $ack_success == 0 ]] && echo "Acknowledgement failed" && attempt=0
+			if [[ $ack_success == 0 ]]; then
+				echo "`date +%H:%M:%S` : Acknowledgement failed. Starting Acknowledgement tolerance countdown."
+				[ $quiet -eq 0 ] && notify-send "Cyberoam Session Failed" "Trying again..."
+				attempt=0
+				ack_tolerate=$ACK_TOLERATE_MAX
+				while [ $ack_tolerate -gt 0 ]; do
+					ack_tolerate=$[ $ack_tolerate - 1 ]
+					sleep $ACK_TOLERATE_SLEEP
+					ack
+					[ $ack_success -eq 1 ] && ack_tolerate=0
+				done
+				[ $ack_success -eq 0 ] && echo "`date +%H:%M:%S` : Acknowledgement Tolerance failed."
+			fi
 		;;
 	esac
 done
