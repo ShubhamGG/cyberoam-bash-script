@@ -118,7 +118,7 @@ if [ $verbose -eq 0 ]; then
 	comman="$name -v"
 	[ $quiet -eq 1 ] && comman="$comman -q"
 	[ ! -p ~/.cyberoam ] && mkfifo ~/.cyberoam
-	( setsid $comman $user > ~/dev/null < ~/.cyberoam )&
+	( setsid $comman $user > /dev/null 2>&1 < ~/.cyberoam )&
 	[ ! -e conffile ] && echo $url > ~/.cyberoam && echo $password > ~/.cyberoam
 	exit 0
 fi
@@ -134,7 +134,7 @@ function login {
 		login_success=1
 		login_count=$LOGIN_COUNT_MAX
 	elif [[ $response =~ "Maximum Login Limit" ]]; then
-		>&2 echo "`date +%H:%M:%S` : Maximum Login Limit Reached"
+		echo "`date +%H:%M:%S` : Maximum Login Limit Reached"
 		[ $quiet -eq 0 ] && notify-send "Maximum Login Limit Reached" "user: $user"
 		exit -1
 	else
