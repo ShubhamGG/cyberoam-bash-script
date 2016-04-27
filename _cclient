@@ -2,17 +2,25 @@ function _cyberoam_client()
 {
 	local word=${COMP_WORDS[COMP_CWORD]}
 	local prev=${COMP_WORDS[COMP_CWORD-1]}
-	
-	list1=""
-	if [ ! $prev == "-l" ] && [ ! $prev == "--help" ] && [ $COMP_CWORD == 1 ] || [[ $prev =~ "-" ]] ; then 
-		shopt -s nullglob
-		for i in ~/.cyberoam_*.conf
-		do
-			local a=${i#*_}
-			list1="$list1 ${a%.*}"
-		done
+	STATFILE=~/.cyberoam_statfile.conf
+	LoginStatus=false
+	[ -e $STATFILE ] && . $STATFILE
+	list=""
+	if [ ! $prev == "-l" ] && [ ! $prev == "--help" ]; then
+		if [ $COMP_CWORD == 1 ] || [[ $prev =~ "-" ]] ; then
+			shopt -s nullglob
+			if [ $LoginStatus ]; then
+				list="-l"
+			else
+				for i in ~/.cyberoam_*.conf
+				do
+					local a=${i#*_}
+					list="$list ${a%.*}"
+				done
+			fi
+		fi
 	fi
-	COMPREPLY=($(compgen -W "${list1}" -- ${word}))
+	COMPREPLY=($(compgen -W "${list}" -- ${word}))
 	return 0
 }
 complete -F _cyberoam_client cyberoam-client

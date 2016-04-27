@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ACK_TOLERATE_MAX=2
+ACK_TOLERATE_MAX=6
 ACK_TOLERATE_SLEEP=10
 LOGIN_COUNT_MAX=5
 login_success=0
@@ -12,6 +12,7 @@ quiet=0
 verbose=0
 name=$0
 name=${name##*/}
+STATFILE=~/.cyberoam_statfile.conf
 function print_usage {
 	echo "Usage: $name [-v] { [-q] [-d|-s] <username> | -l } "
 	echo "-d : delete configuration file (if found) for username."
@@ -164,6 +165,7 @@ function logoutt {
 		echo "`date +%H:%M:%S` : Logout failed"
 		[ $quiet -eq 0 ] && notify-send "Logout Failed" "user: $user"
 	fi
+	echo "LoginStatus=false" > $STATFILE
 	trap - SIGINT
 	kill -INT $$
 	exit 0
@@ -175,13 +177,13 @@ while [ 1 ]
 do
 	case $attempt in
 		0)	login
-			[[ $login_success == 1 ]] && attempt=1 && trap logoutt SIGINT
+			[[ $login_success == 1 ]] && attempt=1 && trap logoutt SIGINT && echo "LoginStatus=true" > $STATFILE
 		;;
 		1)	sleep 180
 			ack
 			if [[ $ack_success == 0 ]]; then
 				echo "`date +%H:%M:%S` : Acknowledgement failed. Starting Acknowledgement tolerance countdown."
-				[ $quiet -eq 0 ] && notify-send "Cyberoam Session Failed" "Trying again..."
+				#[ $quiet -eq 0 ] && notify-send "Cyberoam Session Failed" "Trying again..."
 				attempt=0
 				ack_tolerate=$ACK_TOLERATE_MAX
 				while [ $ack_tolerate -gt 0 ]; do
