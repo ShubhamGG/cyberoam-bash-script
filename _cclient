@@ -4,12 +4,13 @@ function _cyberoam_client()
 	local prev=${COMP_WORDS[COMP_CWORD-1]}
 	STATFILE=~/.cyberoam_statfile.conf
 	LoginStatus=false
-	[ -e $STATFILE ] && . $STATFILE
+	other=`ps -lC cyberoam-client | grep -v PID`
+	[ -n "$other" ] && LoginStatus=true
 	list=""
 	if [ ! $prev == "-l" ] && [ ! $prev == "--help" ]; then
 		if [ $COMP_CWORD == 1 ] || [[ $prev =~ "-" ]] ; then
 			shopt -s nullglob
-			if [ $LoginStatus ]; then
+			if [[ $LoginStatus = true ]]; then
 				list="-l"
 			else
 				for i in ~/.cyberoam_*.conf

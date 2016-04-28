@@ -12,7 +12,6 @@ quiet=0
 verbose=0
 name=$0
 name=${name##*/}
-STATFILE=~/.cyberoam_statfile.conf
 function print_usage {
 	echo "Usage: $name [-v] { [-q] [-d|-s] <username> | -l } "
 	echo "-d : delete configuration file (if found) for username."
@@ -165,7 +164,6 @@ function logoutt {
 		echo "`date +%H:%M:%S` : Logout failed"
 		[ $quiet -eq 0 ] && notify-send "Logout Failed" "user: $user"
 	fi
-	echo "LoginStatus=false" > $STATFILE
 	trap - SIGINT
 	kill -INT $$
 	exit 0
@@ -177,7 +175,7 @@ while [ 1 ]
 do
 	case $attempt in
 		0)	login
-			[[ $login_success == 1 ]] && attempt=1 && trap logoutt SIGINT && echo "LoginStatus=true" > $STATFILE
+			[[ $login_success == 1 ]] && attempt=1 && trap logoutt SIGINT
 		;;
 		1)	sleep 180
 			ack
