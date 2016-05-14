@@ -1,11 +1,8 @@
 #!/bin/bash
 
-ACK_TOLERATE_MAX=6
-ACK_TOLERATE_SLEEP=10
 LOGIN_COUNT_MAX=5
 login_success=0
 login_count=$LOGIN_COUNT_MAX
-ack_success=0
 option=0
 optcount=0
 quiet=0
@@ -148,10 +145,15 @@ function login {
 }
 
 function ack {
-	ack_success=0
 	echo "`date +%H:%M:%S` : Sending keep-alive request"
 	local response=`curl -s -k -G -d mode=192 -d username=$user https://$url:8090/live`
-	[[ $response =~ "<ack><![CDATA[ack]]></ack>" ]] && ack_success=1
+}
+
+function check {
+	check_success=1
+	echo "`date +%H:%M:%S` : Testing connection"
+	local response=`curl -s -I http://www.google.com/robots.txt`
+	[[ $response =~ "Please login" ]] && check_success=0
 }
 
 function logoutt {
@@ -175,22 +177,15 @@ while [ 1 ]
 do
 	case $attempt in
 		0)	login
-			[[ $login_success == 1 ]] && attempt=1 && trap logoutt SIGINT
+			[[ $login_success == 1 ]] && trap logoutt SIGINT && attempt=1 && ack
+			sleep 5
 		;;
 		1)	sleep 180
-			ack
-			if [[ $ack_success == 0 ]]; then
-				echo "`date +%H:%M:%S` : Acknowledgement failed. Starting Acknowledgement tolerance countdown."
-				#[ $quiet -eq 0 ] && notify-send "Cyberoam Session Failed" "Trying again..."
+			check
+			if [[ $check_success == 0 ]]; then
+				echo "`date +%H:%M:%S` : Connection Test failed. Login required."
 				attempt=0
-				ack_tolerate=$ACK_TOLERATE_MAX
-				while [ $ack_tolerate -gt 0 ]; do
-					ack_tolerate=$[ $ack_tolerate - 1 ]
-					sleep $ACK_TOLERATE_SLEEP
-					ack
-					[ $ack_success -eq 1 ] && ack_tolerate=0
-				done
-				[ $ack_success -eq 0 ] && echo "`date +%H:%M:%S` : Acknowledgement Tolerance failed."
+				# [ $quiet -eq 0 ] && notify-send "Cyberoam Session Failed" "Trying again..."
 			fi
 		;;
 	esac
