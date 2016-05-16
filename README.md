@@ -1,5 +1,6 @@
 # Cyberoam Bash Script
 Bash script for logging in, keeping session alive and logging out from a cyberoam server, with autocompletion of saved profiles.
+The script is licensed under GPLv3.
 
 <h4>Usage:</h4>
 `cyberoam-client [-v] { [-q] [-d|-s] <username> | -l } `
