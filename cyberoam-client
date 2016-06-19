@@ -129,7 +129,7 @@ if [ $verbose -eq 0 ]; then
 	pipe=$conffolder/daemonizer
 	[ ! -p $pipe ] && mkfifo $pipe
 	( setsid $comman $user > /dev/null 2>&1 < $pipe )&
-	[ ! -e $conffile ] && echo $url > $pipe && echo $password > $pipe
+	echo $url > $pipe && echo $password > $pipe
 	exit 0
 fi
 
