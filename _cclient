@@ -2,7 +2,6 @@ function _cyberoam_client()
 {
 	local word=${COMP_WORDS[COMP_CWORD]}
 	local prev=${COMP_WORDS[COMP_CWORD-1]}
-	STATFILE=~/.cyberoam_statfile.conf
 	LoginStatus=false
 	other=`ps -lC cyberoam-client | grep -v PID`
 	[ -n "$other" ] && LoginStatus=true
@@ -13,7 +12,7 @@ function _cyberoam_client()
 			if [[ $LoginStatus = true ]]; then
 				list="-l"
 			else
-				for i in ~/.cyberoam_*.conf
+				for i in ~/.config/cyberoam/*.conf
 				do
 					local a=${i#*_}
 					list="$list ${a%.*}"

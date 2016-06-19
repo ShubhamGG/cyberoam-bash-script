@@ -1,25 +1,30 @@
 #!/bin/bash
 
+ACK_INTERVAL=180 #in seconds
 LOGIN_COUNT_MAX=5
-login_success=0
-login_count=$LOGIN_COUNT_MAX
+LOGIN_ATTEMPT_INTERVAL=5 #in seconds
+
+name=$0
+name=${name##*/}
+
+function print_usage {
+	echo "Usage:"
+	echo "$name [-v] [-q] [-s] <username>"
+	echo "$name [-v] -l"
+	echo "$name [-v] -d <username>"
+	echo "-d : delete configuration file (if found) for username."
+	echo "-s : save configuration file (overwrite if already exists) for username."
+	echo "     If -s is not specified, then saved config file for username is used (no input asked). If the config file doesn't exist, the login info needs to be inputted and is not stored."
+	echo "-q : Be quiet i.e. don't send notifications of events."
+	echo "-l : logout. Other way to logout is to send ctrl-c i.e. SIGINT to the running process of $name."
+	echo "-v : give verbose output."
+}
+
+#parsing options
 option=0
 optcount=0
 quiet=0
 verbose=0
-name=$0
-name=${name##*/}
-function print_usage {
-	echo "Usage: $name [-v] { [-q] [-d|-s] <username> | -l } "
-	echo "-d : delete configuration file (if found) for username."
-	echo "-s : save configuration file (override if already exists) for username."
-	echo "-q : Be quiet i.e. don't send notifications of events."
-	echo "-l : logout. Other way to logout is to send ctrl-c i.e. SIGINT to the running process of $name."
-	echo "-v : give verbose output."
-	echo "If -s is not specified, then saved config file for username is used (no input asked). If the config file doesn't exist, the login info needs to be inputted and is not stored."
-}
-
-#parsing options
 [ $# -eq 0 ] || [[ $1 == "--help" ]] && print_usage && exit 0
 while getopts ":d::s::qlv" opt; do
 	case $opt in
@@ -63,7 +68,13 @@ if [ $option -eq 0 ]; then
 fi
 
 # processing option -d i.e. deleting conffile
-conffile=~/.cyberoam_$user.conf
+conffolder=~/.config/cyberoam
+if [ ! -d $conffolder ]; then
+	[ ! -d ~/.config ] && mkdir ~/.config
+	mkdir ~/.config/cyberoam
+	conffolder=~/.config/cyberoam
+fi
+conffile=$conffolder/$user.conf
 if [ $option == 1 ]; then
 	if [ -e $conffile ]; then
 		rm $conffile && [ $verbose -eq 1 ] && echo "Configuration file deleted succesfully"
@@ -90,6 +101,7 @@ elif [ -n "$other" ]; then #preventing duplicate processes from running
 	exit 0
 fi
 
+# function to accept login info from user
 function gather_details {
 	echo -n "Cyberoam server ip address: "
 	read url
@@ -98,7 +110,7 @@ function gather_details {
 	echo ""
 }
 
-# processing option -s and the case with neither -s nor -d
+# processing option -s and its absence i.e. saving, loading, overwriting config file or just taking input
 if [ $option -eq 2 ]; then
 	[ -e $conffile ] && echo "">$conffile
 	gather_details
@@ -114,9 +126,10 @@ fi
 if [ $verbose -eq 0 ]; then
 	comman="$name -v"
 	[ $quiet -eq 1 ] && comman="$comman -q"
-	[ ! -p ~/.cyberoam ] && mkfifo ~/.cyberoam
-	( setsid $comman $user > /dev/null 2>&1 < ~/.cyberoam )&
-	[ ! -e conffile ] && echo $url > ~/.cyberoam && echo $password > ~/.cyberoam
+	pipe=$conffolder/daemonizer
+	[ ! -p $pipe ] && mkfifo $pipe
+	( setsid $comman $user > /dev/null 2>&1 < $pipe )&
+	[ ! -e $conffile ] && echo $url > $pipe && echo $password > $pipe
 	exit 0
 fi
 
@@ -127,33 +140,23 @@ function login {
 	local response=`curl -s -k -d mode=191 -d username=$user -d password=$password https://$url:8090/login.xml`
 	if [[ $response =~ "successfully logged in" ]]; then
 		echo "`date +%H:%M:%S` : Logged in successfully"
-		[ $quiet -eq 0 ] && notify-send "Logged in successfully" "user: $user"
+		[ $quiet -eq 0 ] && notify-send -i info "Logged in successfully" "user: $user"
 		login_success=1
-		login_count=$LOGIN_COUNT_MAX
 	elif [[ $response =~ "Maximum Login Limit" ]]; then
 		echo "`date +%H:%M:%S` : Maximum Login Limit Reached"
-		[ $quiet -eq 0 ] && notify-send "Maximum Login Limit Reached" "user: $user"
+		[ $quiet -eq 0 ] && notify-send -i error "Maximum Login Limit Reached" "user: $user"
 		exit -1
 	else
 		echo "`date +%H:%M:%S` : Login failed"
-		login_count=$[ $login_count - 1 ]
-		if [ $login_count -eq 0 ]; then
-			[ $quiet -eq 0 ] && notify-send "Login Failed" "user: $user"
-			exit 0
-		fi
 	fi
 }
 
 function ack {
 	echo "`date +%H:%M:%S` : Sending keep-alive request"
 	local response=`curl -s -k -G -d mode=192 -d username=$user https://$url:8090/live`
-}
-
-function check {
-	check_success=1
-	echo "`date +%H:%M:%S` : Testing connection"
-	local response=`curl -s -I http://www.google.com/robots.txt`
-	[[ $response =~ "Please login" ]] && check_success=0
+	ack_success=1
+	response=`curl -s -I http://www.google.com/robots.txt`
+	[[ $response =~ "Please login" ]] && ack_success=0
 }
 
 function logoutt {
@@ -161,31 +164,45 @@ function logoutt {
 	local response=`curl -s -k -d mode=193 -d username=$user https://$url:8090/logout.xml`
 	if [[ $response =~ "You have successfully logged off" ]]; then
 		echo "`date +%H:%M:%S` : Logged out successfully"
-		[ $quiet -eq 0 ] && notify-send "Logged out successfully" "user: $user"
+		[ $quiet -eq 0 ] && notify-send -i info "Logged out successfully" "user: $user"
 	else
 		echo "`date +%H:%M:%S` : Logout failed"
-		[ $quiet -eq 0 ] && notify-send "Logout Failed" "user: $user"
+		[ $quiet -eq 0 ] && notify-send -i error "Logout Failed" "user: $user"
 	fi
 	trap - SIGINT
 	kill -INT $$
 	exit 0
 }
 
-# attempt=0 means it will now attempt to login, 1 means ack
+login_count=$LOGIN_COUNT_MAX
 attempt=0
 while [ 1 ]
 do
 	case $attempt in
-		0)	login
-			[[ $login_success == 1 ]] && trap logoutt SIGINT && attempt=1 && ack
-			sleep 5
+		0)	# login attempt
+			login
+			if [[ $login_success == 1 ]]; then
+				trap logoutt SIGINT
+				login_count=$LOGIN_COUNT_MAX
+				attempt=1
+				ack
+			elif [[ $login_count > -1 ]]; then
+				login_count=$[ $login_count - 1 ]
+				if [ $login_count -eq 0 ]; then
+					echo "`date +%H:%M:%S` : Abandoning Attempt. Exiting..."
+					[ $quiet -eq 0 ] && notify-send -i error "Login Failed" "user: $user"
+					exit 0
+				fi
+			fi
+			sleep $LOGIN_ATTEMPT_INTERVAL
 		;;
-		1)	sleep 180
-			check
-			if [[ $check_success == 0 ]]; then
-				echo "`date +%H:%M:%S` : Connection Test failed. Login required."
+		1)	# keep-alive request
+			sleep $ACK_INTERVAL
+			ack
+			if [[ $ack_success == 0 ]]; then
+				echo "`date +%H:%M:%S` : keep-alive request failed. Login required."
 				attempt=0
-				# [ $quiet -eq 0 ] && notify-send "Cyberoam Session Failed" "Trying again..."
+				# [ $quiet -eq 0 ] && notify-send -i error "Cyberoam Session Failed" "Trying again..."
 			fi
 		;;
 	esac
