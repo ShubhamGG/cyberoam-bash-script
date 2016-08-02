@@ -28,7 +28,7 @@ optcount=0
 quiet=0
 verbose=0
 [ $# -eq 0 ] || [[ $1 == "--help" ]] && print_usage && exit 0
-while getopts ":d::s::qlv" opt; do
+while getopts ":d::s::qlvi" opt; do
 	case $opt in
 		d)	optcount=$[ $optcount + 1 ]
 			[[ $optcount > 1 ]] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
@@ -105,9 +105,10 @@ elif [ $option -eq 4 ]; then # Send SIGUSR1 to other process
 	if [ -z "$other" ]; then
 		echo "No running process of $name found."
 	else
-		kill - $other
+		kill -USR1 $other
 		pkill -P $other sleep
 		[ $verbose -eq 1 ] && echo "`date +%H:%M:%S` : reevaluation signal sent."
+		exit 0
 	fi
 elif [ -n "$other" ]; then #preventing duplicate processes from running
 	echo "$name already running with pid $other."
