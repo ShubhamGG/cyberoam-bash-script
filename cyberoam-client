@@ -17,6 +17,8 @@ function print_usage {
 	echo "     If -s is not specified, then saved config file for username is used (no input asked). If the config file doesn't exist, the login info needs to be inputted and is not stored."
 	echo "-q : Be quiet i.e. don't send notifications of events."
 	echo "-l : logout. Other way to logout is to send ctrl-c i.e. SIGINT to the running process of $name."
+	echo "-i : show info. This option asks the running cyberoam process to show a notification of its current situation and also revalidate login status."
+	echo "This option causes the other process to send a notification irrespective of the -q parameter, if it was given any."
 	echo "-v : give verbose output."
 }
 
@@ -45,6 +47,8 @@ while getopts ":d::s::qlv" opt; do
 		l)	[ $quiet -eq 1 ] || [ $optcount -gt 0 ] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
 			option=3
 		;;
+		i)	[ $quiet -eq 1 ] || [ $optcount -gt 0 ] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
+			option=4
 		\?)
 			echo "Invalid option: -$OPTARG" >&2 && print_usage >&2
 			exit -2
@@ -56,7 +60,7 @@ while getopts ":d::s::qlv" opt; do
 done
 optcount=0
 [ $verbose -eq 1 ] && optcount=$[ $optcount + 1 ]
-[ $option -eq 3 ] && [ $[ $# - $optcount ] -gt 1 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
+[[ $option = 3 || $option = 4 ]] && [ $[ $# - $optcount ] -gt 1 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
 [ $quiet -eq 1 ] && optcount=$[ $optcount + 1 ]
 [ $[ $# - $optcount ] -gt 2 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
 
@@ -96,6 +100,13 @@ if [ $option -eq 3 ]; then # Logging out by sending SIGINT to other process
 		[ $verbose -eq 1 ] && echo "`date +%H:%M:%S` : kill command sent."
 	fi
 	exit 0
+elif [ $option -eq 4 ]; then # Send SIGUSR1 to other process
+	if [ -z "$other" ]; then
+		echo "No running process of $name found."
+	else
+		kill - $other
+		pkill -P $other sleep
+		[ $verbose -eq 1 ] && echo "`date +%H:%M:%S` : reevaluation signal sent."
 elif [ -n "$other" ]; then #preventing duplicate processes from running
 	echo "$name already running with pid $other."
 	exit 0
@@ -173,6 +184,20 @@ function logoutt {
 	kill -INT $$
 	exit 0
 }
+
+# recheck login status
+function recheck {
+	echo "`date +%H:%M:%S` : Starting recheck process"
+	if [[ $login_success = 1 ]]
+		notify-send -i info -t 2000 "Logged in as $user" "Rechecking login status"
+		ack
+		[[ $ack_success = 1 ]] && attempt=1 || attempt=0
+	else
+		notify-send -i info -t 2000 "Cyberoam not logged in."
+	fi
+}
+
+trap recheck SIGUSR1
 
 login_count=$LOGIN_COUNT_MAX
 attempt=0

@@ -18,6 +18,9 @@ If `-s` is not specified, then saved config file for username is used (no input 
 
 `-l` : logout. Other way to logout is to send ctrl-c i.e. SIGINT to the running process of cyberoam-client.
 
+`-i` : show info. This option asks the running cyberoam process to show a notification of its current situation and also revalidate login status. 
+This option causes the other process to send a notification irrespective of the -q parameter, if it was given any.
+
 `-v` : give verbose output.
 
 The script traps `Ctrl+c` i.e. `SIGINT` and interprets it as the signal to logout. So, apart from running `cyberoam-client -l` you can send the running process a `SIGINT` using `kill -INT pid` (`pid` is the process id of the running `cyberoam-client` process) or, if it is in the foreground in your terminal, pressing `Ctrl+c`.
