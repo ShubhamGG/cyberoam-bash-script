@@ -49,6 +49,7 @@ while getopts ":d::s::qlv" opt; do
 		;;
 		i)	[ $quiet -eq 1 ] || [ $optcount -gt 0 ] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
 			option=4
+		;;
 		\?)
 			echo "Invalid option: -$OPTARG" >&2 && print_usage >&2
 			exit -2
@@ -107,6 +108,7 @@ elif [ $option -eq 4 ]; then # Send SIGUSR1 to other process
 		kill - $other
 		pkill -P $other sleep
 		[ $verbose -eq 1 ] && echo "`date +%H:%M:%S` : reevaluation signal sent."
+	fi
 elif [ -n "$other" ]; then #preventing duplicate processes from running
 	echo "$name already running with pid $other."
 	exit 0
@@ -188,7 +190,7 @@ function logoutt {
 # recheck login status
 function recheck {
 	echo "`date +%H:%M:%S` : Starting recheck process"
-	if [[ $login_success = 1 ]]
+	if [[ $login_success = 1 ]]; then
 		notify-send -i info -t 2000 "Logged in as $user" "Rechecking login status"
 		ack
 		[[ $ack_success = 1 ]] && attempt=1 || attempt=0
