@@ -11,6 +11,7 @@ function print_usage {
 	echo "Usage:"
 	echo "$name [-v] [-q] [-s] <username>"
 	echo "$name [-v] -l"
+	echo "$name [-v] -i"
 	echo "$name [-v] -d <username>"
 	echo "-d : delete configuration file (if found) for username."
 	echo "-s : save configuration file (overwrite if already exists) for username."
@@ -44,10 +45,10 @@ while getopts ":d::s::qlvi" opt; do
 		;;
 		v)	verbose=1
 		;;
-		l)	[ $quiet -eq 1 ] || [ $optcount -gt 0 ] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
+		l)	[[ $quiet = 1 || $option > 0 ]] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
 			option=3
 		;;
-		i)	[ $quiet -eq 1 ] || [ $optcount -gt 0 ] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
+		i)	[[ $quiet = 1 || $option > 0 ]] && echo "Illegal number of options" >&2 && print_usage >&2 && exit -2
 			option=4
 		;;
 		\?)
@@ -65,7 +66,7 @@ optcount=0
 [ $quiet -eq 1 ] && optcount=$[ $optcount + 1 ]
 [ $[ $# - $optcount ] -gt 2 ] && echo "Invalid number of arguments">&2 && print_usage>&2 && exit -2
 
-# Setting user variable
+# Setting user variable when options s,d,i,l are not given
 if [ $option -eq 0 ]; then
 	[ $optcount -eq 0 ] && user=$1
 	[ $optcount -eq 1 ] && user=$2
@@ -82,7 +83,7 @@ fi
 conffile=$conffolder/$user.conf
 if [ $option == 1 ]; then
 	if [ -e $conffile ]; then
-		rm $conffile && [ $verbose -eq 1 ] && echo "Configuration file deleted succesfully"
+		rm $conffile && [ $verbose -eq 1 ] && echo "`date +%H:%M:%S` : Configuration file deleted succesfully"
 	else
 		echo "Specified Configuration file not found."
 	fi
@@ -108,8 +109,8 @@ elif [ $option -eq 4 ]; then # Send SIGUSR1 to other process
 		kill -USR1 $other
 		pkill -P $other sleep
 		[ $verbose -eq 1 ] && echo "`date +%H:%M:%S` : reevaluation signal sent."
-		exit 0
 	fi
+	exit 0
 elif [ -n "$other" ]; then #preventing duplicate processes from running
 	echo "$name already running with pid $other."
 	exit 0

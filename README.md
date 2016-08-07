@@ -7,6 +7,8 @@ The script is licensed under GPLv3.
 
 `cyberoam-client [-v] -l `
 
+`cyberoam-client [-v] -i `
+
 `cyberoam-client [-v] -d <username> `
 
 `-d` : delete configuration file (if found) for username.
