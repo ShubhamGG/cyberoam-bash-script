@@ -161,6 +161,10 @@ function login {
 		echo "`date +%H:%M:%S` : Maximum Login Limit Reached"
 		[ $quiet -eq 0 ] && notify-send -i error "Maximum Login Limit Reached" "user: $user"
 		exit -1
+	elif [[ $response =~ "data transfer has been exceeded" ]]; then
+		echo "`date +%H:%M:%S` : Data Transfer Exceeded"
+		[ $quiet -eq 0 ] && notify-send -i error "Data Transfer Exceeded" "user: $user"
+		exit -1
 	else
 		echo "`date +%H:%M:%S` : Login failed"
 	fi
@@ -198,6 +202,7 @@ function recheck {
 		[[ $ack_success = 1 ]] && attempt=1 || attempt=0
 	else
 		notify-send -i info -t 2000 "Cyberoam not logged in."
+		login
 	fi
 }
 
